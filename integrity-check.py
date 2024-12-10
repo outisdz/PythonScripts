@@ -5,6 +5,8 @@ import hmac
 import os
 import pathlib
 import time
+from rich.prompt import Confirm
+from rich import print
 
 
 def argument():
@@ -53,11 +55,11 @@ def hashfile(source_path: str):
                 hss.update(chunk)
         return hss.digest()
     except FileNotFoundError:
-        print(f'❌ Error: The file "{pathlib.Path(source_path).name}" was not found. '
-              f'Please check the path and try again.')
+        print(f'[bold red]:cross_mark: {pathlib.Path(source_path).name}[/bold red] The file was not found. Please '
+              f'check the path and try again.')
         return None
     except Exception as e:
-        print(f'❌ An unexpected error occurred: {e}')
+        print(f'[bold red]:cross_mark: An unexpected error occurred: {e}')
         return None
 
 
@@ -65,16 +67,20 @@ def savefile(destination_path: str, data: bytes):
     try:
         with open(destination_path, 'xb') as f:
             f.write(data)
-        print(f'✅ The file "{pathlib.Path(destination_path).name}" has been created successfully.')
+        print(f'[bold green]:white_heavy_check_mark:{pathlib.Path(destination_path).name}[/bold green] The file has '
+              f'been created successfully.')
     except FileExistsError:
-        print(f'The file "{pathlib.Path(destination_path).name}" already exists.')
-        yn = input('Do you want to overwrite it? (y/N): ')
-        if yn in ('y', 'Y'):
+        print(f'[bold red]:warning: The file {pathlib.Path(destination_path).name} '
+              f'already exists.')
+        yn = Confirm.ask("Do you want to overwrite it?", default=False)
+        if yn:
             with open(destination_path, 'wb') as f:
                 f.write(data)
-            print(f'✅ The file {pathlib.Path(destination_path).name} has been successfully overwritten.')
+            print(f'[bold green]:white_heavy_check_mark: {pathlib.Path(destination_path).name}[/bold green] The file '
+                  f'has been successfully overwritten.')
         else:
-            print('❌ The file has not been saved. Please check your options.')
+            print(f'[bold red]:warning: {pathlib.Path(destination_path).name}[/bold red] The file has not been saved. '
+                  f'Please check your options.')
 
 
 def integrity_check(source_path: str, destination_path: str):
@@ -86,8 +92,8 @@ def integrity_check(source_path: str, destination_path: str):
             h_file2 = d_file.read()
         return hmac.compare_digest(h_file1, h_file2)
     except FileNotFoundError:
-        print(f'❌ Error: The file "{pathlib.Path(destination_path).name}" was not found. '
-              f'Please check the path and try again.')
+        print(f'[bold red]:cross_mark: {pathlib.Path(destination_path).name}[/bold red] The file was not found. Please '
+              f'check the path and try again.')
         return None
 
 
@@ -96,15 +102,17 @@ if __name__ == "__main__":
     if args.check:
         check = integrity_check(args.source, args.destination)
         if check is True:
-            print('✅ File Status: The file is okay and has not been tampered with. 🎉')
+            print('[bold green]:white_heavy_check_mark: File Status:[/bold green] The file is okay and has not been '
+                  'tampered with. :party_popper: :partying_face:')
         elif check is False:
-            print('❌ File Status: Warning! The file has been tampered with. ⚠️')
+            print('[bold red]:warning: File Status:[/bold red] Warning! The file has been tampered with. '
+                  '[bold yellow]:warning:[/bold yellow] :boom:')
         else:
-            print('❌ Oops! Something went wrong. Please try again! 😅')
+            print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
 
     if args.create:
         hash_file = hashfile(args.source)
         if hash_file is None:
-            print('❌ Oops! Something went wrong. Please try again! 😅')
+            print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
         else:
             savefile(args.destination, hash_file)
