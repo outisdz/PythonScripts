@@ -1,9 +1,11 @@
 import argparse
 import base64
+import binascii
 import hashlib
 import hmac
 import os
 import pathlib
+import tempfile
 import time
 from rich.prompt import Confirm
 from rich import print
@@ -27,15 +29,17 @@ def argument():
                         type=str,
                         required=True)
 
-    parser.add_argument('-c', '--create',
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('-c', '--create',
                         help='🛠️ Create a hash file for the specified source file.',
                         action='store_true')
 
-    parser.add_argument('--check',
+    group.add_argument('--check',
                         help='🔒 Check the integrity of the specified file using its hash.',
                         action='store_true')
 
-    parser.add_argument('--dhash',
+    group.add_argument('--dhash',
                         help='🔑 Provide the hex digest for integrity checking.',
                         type=str)
 
@@ -43,6 +47,21 @@ def argument():
 
 
 def hashfile(source_path: str):
+    """
+    Generates a SHA-256 hash of a file that includes both its content and timestamp metadata.
+
+    Specifically, it hashes:
+    - File content (in chunks)
+    - Creation time (ctime)
+    - Last modification time (mtime)
+    - Last access time (atime)
+
+    This method ensures the hash changes not only if the file content is altered,
+    but also if its timestamp metadata is modified (e.g., by copying, accessing, or editing the file).
+
+    :param source_path: Path to the file to be hashed.
+    :return: SHA-256 digest as bytes, or None if an error occurs.
+    """
     try:
         stat = os.stat(source_path)
         metadata = base64.b64encode(time.ctime(stat.st_mtime).encode() +
@@ -96,23 +115,33 @@ def integrity_check(source_path: str, destination_path: str):
               f'check the path and try again.')
         return None
 
+def check(c):
+    if c is True:
+        print('[bold green]:white_heavy_check_mark: File Status:[/bold green] The file is okay and has not been '
+              'tampered with. :party_popper: :partying_face:')
+    elif c is False:
+        print('[bold red]:warning: File Status:[/bold red] Warning! The file has been tampered with. '
+              '[bold yellow]:warning:[/bold yellow] :boom:')
+    else:
+        print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
 
 if __name__ == "__main__":
     args = argument()
     if args.check:
-        check = integrity_check(args.source, args.destination)
-        if check is True:
-            print('[bold green]:white_heavy_check_mark: File Status:[/bold green] The file is okay and has not been '
-                  'tampered with. :party_popper: :partying_face:')
-        elif check is False:
-            print('[bold red]:warning: File Status:[/bold red] Warning! The file has been tampered with. '
-                  '[bold yellow]:warning:[/bold yellow] :boom:')
-        else:
-            print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
-
+        check(integrity_check(args.source, args.destination))
     if args.create:
         hash_file = hashfile(args.source)
         if hash_file is None:
             print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
         else:
             savefile(args.destination, hash_file)
+
+    if args.dhash:
+        with tempfile.NamedTemporaryFile() as temp:
+            try:
+                temp.write(binascii.unhexlify(args.dhash))
+                temp.seek(0)
+                check(integrity_check(args.source, temp.name))
+            except binascii.Error as e:
+                print('[bold red]:x: Hash Error:[/bold red] The provided hash is not a valid hexadecimal string. '
+                      ':warning: Please check your input and try again. :mag:')
