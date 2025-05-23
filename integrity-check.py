@@ -73,17 +73,17 @@ def hashfile(source_path: str):
                 hss.update(chunk)
         return hss.digest()
     except FileNotFoundError:
-        print(f'[bold red]:cross_mark: {Path(source_path).name}[/bold red] The file was not found. Please '
+        print(f'[bold red]:x: {Path(source_path).name}[/bold red] The file was not found. Please '
               f'check the path and try again.')
         return None
     except Exception as e:
-        print(f'[bold red]:cross_mark: An unexpected error occurred: {e}')
+        print(f'[bold red]:x: An unexpected error occurred: {e}')
         return None
 
 
 def savefile(source_path: str,destination_path: str, data: bytes):
     if Path(destination_path).is_dir():
-        print(f'[bold red]:cross_mark: {Path(destination_path)}[/bold red] The destination is a directory. Please '
+        print(f'[bold red]:x: {Path(destination_path)}[/bold red] The destination is a directory. Please '
               f'put the file name.')
         dname = Prompt.ask("Please put the file name:",default=Path(source_path).name+"_hash256")
         destination_path = Path(destination_path).joinpath(dname)
@@ -115,11 +115,11 @@ def integrity_check(source_path: str, destination_path: str):
             h_file2 = d_file.read()
         return hmac.compare_digest(h_file1, h_file2)
     except FileNotFoundError:
-        print(f'[bold red]:cross_mark: {Path(destination_path).name}[/bold red] The file was not found. Please '
+        print(f'[bold red]:x: {Path(destination_path).name}[/bold red] The file was not found. Please '
               f'check the path and try again.')
         return None
     except IsADirectoryError:
-        print(f'[bold red]:cross_mark: {Path(destination_path)}[/bold red] is a directory. Please '
+        print(f'[bold red]:x: {Path(destination_path)}[/bold red] is a directory. Please '
               f'check the path and try again.')
 
 def check(c):
