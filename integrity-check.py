@@ -3,12 +3,11 @@ import base64
 import binascii
 import hashlib
 import hmac
-import os
-import pathlib
 import tempfile
 import time
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich import print
+from pathlib import Path
 
 
 def argument():
@@ -63,7 +62,7 @@ def hashfile(source_path: str):
     :return: SHA-256 digest as bytes, or None if an error occurs.
     """
     try:
-        stat = os.stat(source_path)
+        stat = Path(source_path).lstat()
         metadata = base64.b64encode(time.ctime(stat.st_mtime).encode() +
                                     time.ctime(stat.st_ctime).encode() +
                                     time.ctime(stat.st_atime).encode())
@@ -74,7 +73,7 @@ def hashfile(source_path: str):
                 hss.update(chunk)
         return hss.digest()
     except FileNotFoundError:
-        print(f'[bold red]:cross_mark: {pathlib.Path(source_path).name}[/bold red] The file was not found. Please '
+        print(f'[bold red]:cross_mark: {Path(source_path).name}[/bold red] The file was not found. Please '
               f'check the path and try again.')
         return None
     except Exception as e:
@@ -82,23 +81,28 @@ def hashfile(source_path: str):
         return None
 
 
-def savefile(destination_path: str, data: bytes):
+def savefile(source_path: str,destination_path: str, data: bytes):
+    if Path(destination_path).is_dir():
+        print(f'[bold red]:cross_mark: {Path(destination_path)}[/bold red] The destination is a directory. Please '
+              f'put the file name.')
+        dname = Prompt.ask("Please put the file name:",default=Path(source_path).name+"_hash256")
+        destination_path = Path(destination_path).joinpath(dname)
     try:
         with open(destination_path, 'xb') as f:
             f.write(data)
-        print(f'[bold green]:white_heavy_check_mark:{pathlib.Path(destination_path).name}[/bold green] The file has '
+        print(f'[bold green]:white_heavy_check_mark: {Path(destination_path).name}[/bold green] The file has '
               f'been created successfully.')
     except FileExistsError:
-        print(f'[bold red]:warning: The file {pathlib.Path(destination_path).name} '
+        print(f'[bold red]:warning: The file {Path(destination_path).name} '
               f'already exists.')
         yn = Confirm.ask("Do you want to overwrite it?", default=False)
         if yn:
             with open(destination_path, 'wb') as f:
                 f.write(data)
-            print(f'[bold green]:white_heavy_check_mark: {pathlib.Path(destination_path).name}[/bold green] The file '
+            print(f'[bold green]:white_heavy_check_mark: {Path(destination_path).name}[/bold green] The file '
                   f'has been successfully overwritten.')
         else:
-            print(f'[bold red]:warning: {pathlib.Path(destination_path).name}[/bold red] The file has not been saved. '
+            print(f'[bold red]:warning: {Path(destination_path).name}[/bold red] The file has not been saved. '
                   f'Please check your options.')
 
 
@@ -111,9 +115,12 @@ def integrity_check(source_path: str, destination_path: str):
             h_file2 = d_file.read()
         return hmac.compare_digest(h_file1, h_file2)
     except FileNotFoundError:
-        print(f'[bold red]:cross_mark: {pathlib.Path(destination_path).name}[/bold red] The file was not found. Please '
+        print(f'[bold red]:cross_mark: {Path(destination_path).name}[/bold red] The file was not found. Please '
               f'check the path and try again.')
         return None
+    except IsADirectoryError:
+        print(f'[bold red]:cross_mark: {Path(destination_path)}[/bold red] is a directory. Please '
+              f'check the path and try again.')
 
 def check(c):
     if c is True:
@@ -125,6 +132,33 @@ def check(c):
     else:
         print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
 
+def check_with_dhash():
+    """
+    Checks the integrity of a file using a provided SHA-256 hash digest (hexadecimal string).
+
+    Specifically, this option:
+    - Accepts a SHA-256 hash digest as a hexadecimal string via the --dhash argument.
+    - Converts the hexadecimal string to its raw binary form.
+    - Compares this digest to the hash computed from the specified file, including:
+      - File content (in chunks)
+      - Creation time (ctime)
+      - Last modification time (mtime)
+      - Last access time (atime)
+
+    This method enables integrity verification without needing an external hash file,
+    as long as you have the correct digest. It is especially useful for quick checks or
+    when sharing/verifying hashes in text form.
+    """
+    with tempfile.NamedTemporaryFile() as temp:
+        try:
+            temp.write(binascii.unhexlify(args.dhash))
+            temp.seek(0)
+            check(integrity_check(args.source, temp.name))
+        except binascii.Error:
+            print('[bold red]:x: Hash Error:[/bold red] The provided hash is not a valid hexadecimal string. '
+                  ':warning: Please check your input and try again. :mag:')
+
+
 if __name__ == "__main__":
     args = argument()
     if args.check:
@@ -134,14 +168,7 @@ if __name__ == "__main__":
         if hash_file is None:
             print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
         else:
-            savefile(args.destination, hash_file)
+            savefile(args.source,args.destination, hash_file)
 
     if args.dhash:
-        with tempfile.NamedTemporaryFile() as temp:
-            try:
-                temp.write(binascii.unhexlify(args.dhash))
-                temp.seek(0)
-                check(integrity_check(args.source, temp.name))
-            except binascii.Error as e:
-                print('[bold red]:x: Hash Error:[/bold red] The provided hash is not a valid hexadecimal string. '
-                      ':warning: Please check your input and try again. :mag:')
+        check_with_dhash()
