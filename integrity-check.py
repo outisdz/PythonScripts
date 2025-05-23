@@ -76,6 +76,9 @@ def hashfile(source_path: str):
         print(f'[bold red]:x: {Path(source_path).name}[/bold red] The file was not found. Please '
               f'check the path and try again.')
         return None
+    except IsADirectoryError:
+        print(f'[bold red]:x: {Path(source_path)}[/bold red] is a directory. Please '
+              f'check the path and try again.')
     except Exception as e:
         print(f'[bold red]:x: An unexpected error occurred: {e}')
         return None
@@ -129,8 +132,6 @@ def check(c):
     elif c is False:
         print('[bold red]:warning: File Status:[/bold red] Warning! The file has been tampered with. '
               '[bold yellow]:warning:[/bold yellow] :boom:')
-    else:
-        print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
 
 def check_with_dhash():
     """
@@ -165,10 +166,7 @@ if __name__ == "__main__":
         check(integrity_check(args.source, args.destination))
     if args.create:
         hash_file = hashfile(args.source)
-        if hash_file is None:
-            print('[bold]:cross_mark: Oops! Something went wrong. Please try again! :thinking_face:')
-        else:
+        if hash_file:
             savefile(args.source,args.destination, hash_file)
-
     if args.dhash:
         check_with_dhash()
